@@ -1,0 +1,162 @@
+html {
+    box-sizing: border-box;
+}
+
+*, *:before, *:after {
+    box-sizing: inherit;
+}
+
+html, body {
+    height: 100%;
+    touch-action: none;
+}
+
+canvas {
+    display: block;
+}
+
+body {
+    margin: 0;
+}
+
+#unity-container {
+    width: 100%;
+    height: 100%;
+    position: relative;
+}
+
+#unity-canvas {
+    width: 100%;
+    height: 100%;
+    background: #000000;
+    touch-action: none;
+}
+
+#loading-cover {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background:
+        radial-gradient(circle at 50% 42%, rgba(255, 255, 255, 0.55) 0%, rgba(255, 255, 255, 0) 42%),
+        linear-gradient(165deg, #ffe7a8 0%, #ffc4d6 38%, #c9b7ff 72%, #9fd8ff 100%);
+}
+
+#unity-loading-bar {
+    flex: 1 1 auto;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    gap: 28px;
+    padding: 24px;
+}
+
+#unity-logo {
+    display: none;
+}
+
+#zp-orbit-loader {
+    --zp-size: min(72vw, 340px);
+    --zp-radius: calc(var(--zp-size) * 0.38);
+    --zp-ball: clamp(52px, 14vw, 78px);
+    position: relative;
+    width: var(--zp-size);
+    height: var(--zp-size);
+}
+
+#zp-orbit {
+    position: absolute;
+    inset: 0;
+    animation: zp-spin 4.8s linear infinite;
+    will-change: transform;
+}
+
+.zp-slot {
+    position: absolute;
+    top: 50%;
+    left: 50%;
+    width: 0;
+    height: 0;
+    transform: rotate(var(--a)) translate(var(--zp-radius));
+}
+
+.zp-ball {
+    width: var(--zp-ball);
+    height: var(--zp-ball);
+    transform: translate(-50%, -50%);
+    animation: zp-spin-rev 4.8s linear infinite;
+    will-change: transform;
+    filter: drop-shadow(0 6px 10px rgba(40, 20, 60, 0.22));
+}
+
+.zp-ball img {
+    width: 100%;
+    height: 100%;
+    display: block;
+    pointer-events: none;
+    user-select: none;
+}
+
+#unity-progress-bar-empty {
+    width: min(56vw, 240px);
+    height: 10px;
+    margin: 0;
+    text-align: left;
+    border: none;
+    padding: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.45);
+    overflow: hidden;
+    box-shadow: inset 0 1px 2px rgba(0, 0, 0, 0.08);
+}
+
+#unity-progress-bar-full {
+    width: 0%;
+    height: 100%;
+    border-radius: 999px;
+    background: linear-gradient(90deg, #ff8fb8 0%, #ffd36a 45%, #7ad7ff 100%);
+    transition: width 0.35s ease;
+}
+
+/* Kept for PluginYG / loader JS (StartUnityInstance_IfUnloaded), but invisible. */
+.spinner,
+.spinner:after {
+    border-radius: 50%;
+    width: 1px;
+    height: 1px;
+}
+
+.spinner {
+    margin: 0;
+    font-size: 0;
+    position: absolute;
+    opacity: 0;
+    pointer-events: none;
+    overflow: hidden;
+    text-indent: -9999em;
+    border: 0;
+    transform: none;
+    animation: none;
+}
+
+@keyframes zp-spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+@keyframes zp-spin-rev {
+    from { transform: translate(-50%, -50%) rotate(0deg); }
+    to { transform: translate(-50%, -50%) rotate(-360deg); }
+}
+
+@media (max-width: 480px) {
+    #zp-orbit-loader {
+        --zp-size: min(78vw, 280px);
+        --zp-ball: clamp(48px, 15vw, 68px);
+    }
+}

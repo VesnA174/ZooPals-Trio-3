@@ -1,0 +1,310 @@
+﻿<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="utf-8">
+    <meta http-equiv="Content-Type" content="text/html; charset=utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <link rel="stylesheet" href="./style.css">
+
+    <!-- VK Bridge (ads, storage, platform APIs) -->
+    <script src="https://unpkg.com/@vkontakte/vk-bridge/dist/browser.min.js"></script>
+
+    <style>
+        canvas:focus { outline: none; }
+        html, body {
+            padding: 0;
+            margin: 0;
+            overflow: hidden;
+            overscroll-behavior: none;
+            -webkit-touch-callout: none;
+            -webkit-user-select: none;
+            user-select: none;
+            -webkit-tap-highlight-color: rgba(0,0,0,0);
+            height: 100%;
+            touch-action: none;
+        }
+        #unity-canvas {
+            touch-action: none;
+            -ms-touch-action: none;
+            cursor: pointer;
+        }
+    </style>
+</head>
+<body class="dark">
+
+    <div id="unity-container" class="unity-desktop">
+        <canvas id="unity-canvas" tabindex="-1"></canvas>
+    </div>
+    <div id="loading-cover" style="display:none;">
+        <div id="unity-loading-bar">
+            <div id="unity-logo"><img src="Images/logo.png" alt=""></div>
+            <div id="zp-orbit-loader" aria-hidden="true">
+                <div id="zp-orbit">
+                    <div class="zp-slot" style="--a: 0deg;"><div class="zp-ball"><img src="Images/loading/ball_0.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 45deg;"><div class="zp-ball"><img src="Images/loading/ball_1.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 90deg;"><div class="zp-ball"><img src="Images/loading/ball_2.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 135deg;"><div class="zp-ball"><img src="Images/loading/ball_3.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 180deg;"><div class="zp-ball"><img src="Images/loading/ball_4.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 225deg;"><div class="zp-ball"><img src="Images/loading/ball_5.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 270deg;"><div class="zp-ball"><img src="Images/loading/ball_6.png" alt=""></div></div>
+                    <div class="zp-slot" style="--a: 315deg;"><div class="zp-ball"><img src="Images/loading/ball_7.png" alt=""></div></div>
+                </div>
+            </div>
+            <div id="unity-progress-bar-empty" style="display: none;">
+                <div id="unity-progress-bar-full"></div>
+            </div>
+            <div class="spinner"></div>
+        </div>
+    </div>
+
+    <script>
+        // PluginYG stubs (Yandex leftovers may still be compiled into WebGL builds).
+        const NO_DATA = 'no data';
+        window.NO_DATA = NO_DATA;
+        let ysdk = null;
+        let player = null;
+        let ygGameInstance = null;
+        let initGame = false;
+        let initYSDK = false;
+        let isPausedGame = false;
+        let cloudSaves = NO_DATA;
+        window.cloudSaves = cloudSaves;
+
+        function buildEnvironmentDataJson() {
+            const language = (navigator.language || 'ru').split('-')[0];
+            const userAgent = (navigator.userAgent || '').toLowerCase();
+            let deviceType = 'desktop';
+            let isMobile = /mobile|android|iphone|ipod/i.test(userAgent);
+            let isTablet = /tablet|ipad/i.test(userAgent);
+            if (isMobile) deviceType = 'mobile';
+            else if (isTablet) deviceType = 'tablet';
+            let browser = 'Other';
+            const ua = navigator.userAgent || '';
+            if (/YaBrowser|YaSearchBrowser/i.test(ua)) browser = 'Yandex';
+            else if (/Opera|OPR/i.test(ua)) browser = 'Opera';
+            else if (/Firefox/i.test(ua)) browser = 'Firefox';
+            else if (/Edg/i.test(ua)) browser = 'Edge';
+            else if (/Chrome/i.test(ua)) browser = 'Chrome';
+            else if (/Safari/i.test(ua)) browser = 'Safari';
+            return JSON.stringify({
+                language: language,
+                domain: 'ru',
+                deviceType: deviceType,
+                isMobile: isMobile,
+                isDesktop: !isMobile && !isTablet,
+                isTablet: isTablet,
+                isTV: false,
+                appID: '0',
+                browserLang: navigator.language || 'ru',
+                payload: '',
+                platform: navigator.platform || '',
+                browser: browser
+            });
+        }
+
+        var environmentData = buildEnvironmentDataJson();
+        window.environmentData = environmentData;
+
+        function LogStyledMessage(message, style) {
+            try {
+                console.log('%c' + message, style || 'color: #FFDF73; background-color: #454545');
+            } catch (e) {
+                console.log(message);
+            }
+        }
+        window.LogStyledMessage = LogStyledMessage;
+
+        function YG2Instance(method, arg) {
+            if (ygGameInstance == null) return;
+            try {
+                if (typeof arg === 'undefined') ygGameInstance.SendMessage('YG2Instance', method);
+                else ygGameInstance.SendMessage('YG2Instance', method, arg);
+            } catch (e) { /* ignore */ }
+        }
+        window.YG2Instance = YG2Instance;
+
+        function RequestingEnvironmentData() {
+            return new Promise((resolve) => {
+                environmentData = buildEnvironmentDataJson();
+                window.environmentData = environmentData;
+                YG2Instance('SetEnvirData', environmentData);
+                resolve(environmentData);
+            });
+        }
+        window.RequestingEnvironmentData = RequestingEnvironmentData;
+
+        function LoadCloud() {
+            return new Promise((resolve) => {
+                cloudSaves = NO_DATA;
+                window.cloudSaves = cloudSaves;
+                YG2Instance('SetLoadSaves', cloudSaves);
+                resolve(cloudSaves);
+            });
+        }
+        function SaveCloud() { }
+        window.LoadCloud = LoadCloud;
+        window.SaveCloud = SaveCloud;
+
+        function InitGame() {
+            initGame = true;
+            setTimeout(function () {
+                if (isPausedGame === true) {
+                    YG2Instance('SetPauseGame', 'true');
+                }
+            }, 100);
+        }
+        window.InitGame = InitGame;
+
+        function InterAdvShow() {
+            LogStyledMessage('InterAdvShow skipped (VK build)');
+        }
+        window.InterAdvShow = InterAdvShow;
+
+        const buildUrl = ".";
+        const loaderUrl = buildUrl + "/WebGL.loader.js";
+        const config = {
+            dataUrl: buildUrl + "/WebGL.data",
+            frameworkUrl: buildUrl + "/WebGL.framework.js",
+            codeUrl: buildUrl + "/WebGL.wasm.br",
+            streamingAssetsUrl: "StreamingAssets",
+            companyName: "Magical Dream",
+            productName: "ZooPals Trio 3",
+            productVersion: "1.0.0"
+        };
+
+        const container = document.querySelector("#unity-container");
+        const canvas = document.querySelector("#unity-canvas");
+        const loadingCover = document.querySelector("#loading-cover");
+        const progressBarEmpty = document.querySelector("#unity-progress-bar-empty");
+        const progressBarFull = document.querySelector("#unity-progress-bar-full");
+        const spinner = document.querySelector('.spinner');
+
+        window.vkUnityInstance = null;
+
+        // Expose bridge for Unity jslib (CDN UMD build).
+        window.vkBridge = window.vkBridge
+            || (window.vk && window.vk.bridge)
+            || null;
+
+        if (/iPhone|iPad|iPod|Android/i.test(navigator.userAgent)) {
+            container.className = "unity-mobile";
+        }
+
+        loadingCover.style.background = "url('Images/background.png') center / cover";
+        loadingCover.style.display = "";
+
+        document.addEventListener('contextmenu', event => event.preventDefault());
+
+        function FocusGame() {
+            if (!canvas) return;
+            requestAnimationFrame(() => {
+                const active = document.activeElement;
+                if (active && (active.tagName === 'INPUT' || active.tagName === 'TEXTAREA' || active.isContentEditable)) {
+                    return;
+                }
+                canvas.focus({ preventScroll: true });
+            });
+        }
+
+        function silenceWebAudio(hardStop) {
+            try {
+                if (window.vkUnityInstance) {
+                    try {
+                        window.vkUnityInstance.SendMessage(
+                            'BackgroundMusic',
+                            hardStop ? 'SilenceFromWeb' : 'PauseFromWeb',
+                            '');
+                    } catch (e) { /* ignore */ }
+                }
+                const ctx = (typeof WEBAudio !== 'undefined' && WEBAudio && WEBAudio.audioContext)
+                    ? WEBAudio.audioContext
+                    : null;
+                if (ctx && typeof ctx.suspend === 'function') {
+                    ctx.suspend();
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        function resumeWebAudio() {
+            try {
+                const ctx = (typeof WEBAudio !== 'undefined' && WEBAudio && WEBAudio.audioContext)
+                    ? WEBAudio.audioContext
+                    : null;
+                if (ctx && ctx.state === 'suspended' && typeof ctx.resume === 'function') {
+                    ctx.resume();
+                }
+                if (window.vkUnityInstance) {
+                    try {
+                        window.vkUnityInstance.SendMessage('BackgroundMusic', 'ResumeFromWeb', '');
+                    } catch (e) { /* ignore */ }
+                }
+            } catch (e) { /* ignore */ }
+        }
+
+        window.addEventListener('pagehide', function () { silenceWebAudio(true); });
+        window.addEventListener('beforeunload', function () { silenceWebAudio(true); });
+        document.addEventListener('visibilitychange', function () {
+            if (document.hidden) {
+                silenceWebAudio(false);
+            } else {
+                resumeWebAudio();
+            }
+        });
+
+        function withTimeout(promise, ms) {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) => setTimeout(() => reject(new Error('timeout')), ms))
+            ]);
+        }
+
+        async function InitVkBridge() {
+            try {
+                if (!window.vkBridge) {
+                    console.warn('[VK] vk-bridge not loaded вЂ” continue without VK');
+                    return;
+                }
+                // Outside VK iframe this call can hang forever вЂ” always use a timeout.
+                await withTimeout(window.vkBridge.send('VKWebAppInit', {}), 2000);
+                console.log('%c[VK] Bridge init OK', 'color: #4C75A3');
+                try {
+                    await withTimeout(
+                        window.vkBridge.send('VKWebAppCheckNativeAds', { ad_format: 'interstitial' }),
+                        1500
+                    );
+                } catch (e) { /* ignore */ }
+            } catch (e) {
+                console.warn('[VK] Bridge init skipped:', e && e.message ? e.message : e);
+            }
+        }
+
+        const script = document.createElement("script");
+        script.src = loaderUrl;
+        script.onerror = () => {
+            console.error('[ZooPals] Failed to load Unity loader:', loaderUrl);
+        };
+        script.onload = async () => {
+            // Never block Unity startup on VK init (important for Netlify / browser tests).
+            await InitVkBridge();
+
+            createUnityInstance(canvas, config, (progress) => {
+                spinner.style.display = "none";
+                progressBarEmpty.style.display = "";
+                const adjustedProgress = Math.max(progress, 0.05);
+                progressBarFull.style.width = `${100 * adjustedProgress}%`;
+            }).then((unityInstance) => {
+                window.vkUnityInstance = unityInstance;
+                ygGameInstance = unityInstance;
+                initGame = true;
+                loadingCover.style.background = "";
+                loadingCover.style.display = "none";
+                FocusGame();
+            }).catch((message) => {
+                console.error(message);
+            });
+        };
+        document.body.appendChild(script);
+    </script>
+</body>
+</html>
+
